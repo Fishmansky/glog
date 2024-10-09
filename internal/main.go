@@ -419,7 +419,7 @@ func (g *GlogClient) Run() {
 		case d := <-logsChan:
 			slog.Debug("Sending log to server...")
 			if _, err := conn.Write(d); err != nil {
-				slog.Error(err.Error())
+				slog.Error("Error sending log to server", "error", err)
 				os.Exit(1)
 			}
 			slog.Debug("Log sent!")
@@ -429,7 +429,11 @@ func (g *GlogClient) Run() {
 
 func NewGlog() Glog {
 	SetConfigDefaults()
-	viper.ReadInConfig()
+	err := viper.ReadInConfig()
+	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		slog.Error("Configuration file not found!")
+		os.Exit(1)
+	}
 	mode := viper.GetString("mode")
 	if mode == "" {
 		slog.Error("mode variable not set in config file!")
