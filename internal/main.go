@@ -430,7 +430,7 @@ func (g *GlogClient) Run() {
 func NewGlog() Glog {
 	SetConfigDefaults()
 	err := viper.ReadInConfig()
-	if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+	if err != nil {
 		slog.Error("Configuration file not found!")
 		os.Exit(1)
 	}
