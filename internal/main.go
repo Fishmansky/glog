@@ -58,7 +58,7 @@ func (NullWriter) Write([]byte) (int, error) { return 0, nil }
 
 func SetConfigDefaults() {
 	viper.SetDefault("logdir", "/var/log/glog")
-	viper.SetDefault("debuglog", "glog.debug")
+	viper.SetDefault("mainlog", "glog.log")
 	viper.AddConfigPath("/etc/glog")
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
@@ -120,8 +120,8 @@ func ReadGlogClientConfig() GlogClientConfig {
 func NewGlogServer() *GlogServer {
 	conf := ReadGlogServerConfig()
 	logdir := viper.GetString("logdir")
-	debuglog := viper.GetString("debuglog")
-	f, err := os.OpenFile(logdir+"/"+debuglog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	mainlog := viper.GetString("mainlog")
+	f, err := os.OpenFile(logdir+"/"+mainlog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -273,8 +273,8 @@ func (g *GlogServer) Run() {
 func NewGlogClient() *GlogClient {
 	conf := ReadGlogClientConfig()
 	logdir := viper.GetString("logdir")
-	debuglog := viper.GetString("debuglog")
-	f, err := os.OpenFile(logdir+"/"+debuglog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	mainlog := viper.GetString("mainlog")
+	f, err := os.OpenFile(logdir+"/"+mainlog, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatal(err)
 	}
