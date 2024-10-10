@@ -1,12 +1,16 @@
 # glog
 
 Logging solution built with simplicity in mind! Setup your own central logging server easily!
+Written solenly in Go with two external packages: viper and fsnotify.
+
+Supported architectures: x86_64, i136, i686, aarch64 and arm*.
+Supported Linux distributions: ubuntu, debian, linuxmint, fedora, centos, rhel, rocky, almalinux, arch and manjaroo. 
 
 # Why use glog?
 
-1. Simple configuration - no need for diving deep into vast documentation, just a couple of config variables
-2. Deploy in seconds - install logging server and client, specify desired files and let it do the work
-3. If you just need to stream your log files as they are there is no easier way
+1. Simple configuration - no need to dive deep into vast documentation, just a couple of config variables!
+2. Deploy in seconds - install logging server and client, specify desired files and watch your logs fly!
+3. If you just need to stream your log files as they are there is no easier way!
 
 # How to use?
 
@@ -30,6 +34,8 @@ When installed and started glog server starts listening on address specified in 
 Each glog client watches files that you specified in configuration in `logfiles` section, then sends them to glog logging server specified in `addr`.
 
 Server stores logs from clients in separate directories in `/var/log/glog/[CLIENT_NAME]`. Log files are stored in files named as configured by client
+
+# Plans 
 
 # Configuration
 
