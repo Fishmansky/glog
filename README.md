@@ -4,6 +4,7 @@ Logging solution built with simplicity in mind! Setup your own central logging s
 Written solenly in Go with two external packages: viper and fsnotify.
 
 Supported architectures: x86_64, i136, i686, aarch64 and arm*.
+
 Supported Linux distributions: ubuntu, debian, linuxmint, fedora, centos, rhel, rocky, almalinux, arch and manjaroo. 
 
 # Why use glog?
@@ -37,6 +38,9 @@ Server stores logs from clients in separate directories in `/var/log/glog/[CLIEN
 
 # Plans 
 
+[ ] SSL/TLS support
+[ ] ???
+
 # Configuration
 
 There are only 4 main variables: 
@@ -58,7 +62,7 @@ debug=false
 ```
 
 Client only variable:
-- `logfiles` (map) - specify the destination name of given log as key and path to log file to be watched as variable, e.g.:
+- `logfiles` (map) - specify the final log name as key and path to log file to be watched as variable, e.g.:
 ```toml
 [logfiles]
 "syslog"="/var/log/syslog"
