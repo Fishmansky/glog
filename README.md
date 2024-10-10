@@ -11,7 +11,7 @@ Supported Linux distributions: ubuntu, debian, linuxmint, fedora, centos, rhel, 
 
 1. Simple configuration - no need to dive deep into vast documentation. 4-5 config variables is all you need!
 2. Deploy in seconds - install logging server and client, specify desired files and watch your logs fly!
-3. If you just need to stream your log files as they are without any complex proccessing there is no easier way!
+3. If you just need to stream your log files as they are (without any complex proccessing) then there is no easier way than glog!
 
 # How to use?
 
