@@ -50,6 +50,7 @@ type GlogClientConfig struct {
 
 type GlogClient struct {
 	GlogClientConfig
+	conn net.Conn
 }
 
 type NullWriter struct{}
@@ -384,16 +385,16 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 	}
 	return logschan
 }
-func (g *GlogClient) ConnectToServer(c net.Conn) {
+func (g *GlogClient) ServerHandshake() {
 	// send connection request
 	data := []byte(fmt.Sprintf("new-client:%s", g.name))
-	if _, err := c.Write(data); err != nil {
+	if _, err := g.conn.Write(data); err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
 	// read first response
 	buf := make([]byte, 1024)
-	n, err := c.Read(buf)
+	n, err := g.conn.Read(buf)
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
@@ -405,13 +406,13 @@ func (g *GlogClient) ConnectToServer(c net.Conn) {
 	}
 	// send confirmation request
 	data = []byte(fmt.Sprintf("confirmed-client:%s", g.name))
-	if _, err := c.Write(data); err != nil {
+	if _, err := g.conn.Write(data); err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
 	// read second response
 	buf = make([]byte, 1024)
-	n, err = c.Read(buf)
+	n, err = g.conn.Read(buf)
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
@@ -424,36 +425,37 @@ func (g *GlogClient) ConnectToServer(c net.Conn) {
 	slog.Info("Client connected", "Server address", g.addr)
 }
 
-func (g *GlogClient) Run() {
-	// connect to server
+func (g *GlogClient) ConnectToServer() {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
 	var d net.Dialer
-	ctxInit, cancelInit := context.WithTimeout(context.Background(), time.Second*15)
 	d.KeepAlive = 0 // default interval is used
-	defer cancelInit()
-
-	conn, err := d.DialContext(ctxInit, "tcp", g.addr)
+	var err error
+	g.conn, err = d.DialContext(ctx, "tcp", g.addr)
 	if err != nil {
 		slog.Error("Failed to connect to glog server: %v", "error", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
+}
 
-	g.ConnectToServer(conn)
+func (g *GlogClient) Run() {
+	g.ConnectToServer()
+	g.ServerHandshake()
 
 	logsChan := g.GetLogsChan()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	for {
 		select {
 		case <-ctx.Done():
 			g.clientLog.Close()
+			g.conn.Close()
 			slog.Info("Glog finished!")
 			return
 		case d := <-logsChan:
 			slog.Debug("Sending log to server...")
-			if _, err := conn.Write(d); err != nil {
+			if _, err := g.conn.Write(d); err != nil {
 				slog.Error("Error sending log to server", "error", err)
 				os.Exit(1)
 			}
