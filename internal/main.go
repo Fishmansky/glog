@@ -292,6 +292,11 @@ func NewGlogClient() *GlogClient {
 
 }
 
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func (g *GlogClient) GetLogsChan() <-chan []byte {
 	logschan := make(chan []byte)
 	watcher, err := fsnotify.NewWatcher()
@@ -325,6 +330,36 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 				case event, ok := <-watcher.Events:
 					if !ok {
 						return
+					}
+					if event.Op == fsnotify.Remove || event.Op == fsnotify.Rename {
+						tries := 0
+						slog.Debug("Watched file disapeared - trying to rewatch", "file", g.logFiles[l])
+						if !fileExists(g.logFiles[l]) {
+							if tries > 50 {
+								slog.Error("Files rewatching error - 50 retries exceeded")
+								return
+							}
+							time.Sleep(time.Millisecond * 50)
+							tries++
+						}
+						src, err := os.Open(g.logFiles[l])
+						if err != nil {
+							slog.Error("Error opening file to read", "file", g.logFiles[l], "error", err)
+							os.Exit(1)
+						}
+						defer src.Close()
+						err = watcher.Add(g.logFiles[l])
+						if err != nil {
+							slog.Error("Error adding file to watcher", "file", g.logFiles[l], "error", err)
+							os.Exit(1)
+						}
+						slog.Debug("Watching file", "file", g.logFiles[l])
+						_, err = src.Seek(0, os.SEEK_END)
+						if err != nil {
+							slog.Error(err.Error())
+							os.Exit(1)
+						}
+						reader = bufio.NewReader(src)
 					}
 					if event.Op == fsnotify.Write {
 						slog.Debug("Watched file changed", "file", g.logFiles[l])
@@ -398,7 +433,7 @@ func (g *GlogClient) Run() {
 
 	conn, err := d.DialContext(ctxInit, "tcp", g.addr)
 	if err != nil {
-		slog.Error("Failed to connect to glog server: %v", "errormsg", err)
+		slog.Error("Failed to connect to glog server: %v", "error", err)
 		os.Exit(1)
 	}
 	defer conn.Close()
