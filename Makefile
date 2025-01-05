@@ -1,5 +1,5 @@
 build:
-	go build -o bin/glog internal/main.go
+	go build -o bin/glog cmd/main.go
 help:
 	@echo "++ GLOG ++"
 	@echo "Available options:"
