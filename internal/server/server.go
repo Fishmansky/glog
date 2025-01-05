@@ -159,6 +159,11 @@ func (g *GlogServer) ProcessReceivedData(ctx context.Context, gc *GlogConnectedC
 	}
 }
 
+func (g *GlogServer) PrepareClientDir(gc *GlogConnectedClient) error {
+	gc.dir = viper.GetString("logdir") + "/" + gc.name
+	return os.MkdirAll(gc.dir, 0755)
+}
+
 func (g *GlogServer) HandleConnection(ctx context.Context, c net.Conn) {
 	// set connection with new client
 	gc, err := ValidateNewClient(c)
@@ -167,9 +172,7 @@ func (g *GlogServer) HandleConnection(ctx context.Context, c net.Conn) {
 		os.Exit(1)
 	}
 	// prepare client log directory
-	ld := viper.GetString("logdir")
-	gc.dir = ld + "/" + gc.name
-	err = os.MkdirAll(gc.dir, 0755)
+	err = g.PrepareClientDir(gc)
 	if err != nil {
 		slog.Error("Error creating log directory for client", "client", gc.name, "directory", gc.dir, "error", err)
 		os.Exit(1)
