@@ -169,18 +169,10 @@ func (g *GlogServer) HandleConnection(ctx context.Context, c net.Conn) {
 	// prepare client log directory
 	ld := viper.GetString("logdir")
 	gc.dir = ld + "/" + gc.name
-	_, err = os.Stat(gc.dir)
+	err = os.MkdirAll(gc.dir, 0755)
 	if err != nil {
-		if os.IsNotExist(err) {
-			err = os.Mkdir(gc.dir, 0755)
-			if err != nil {
-				slog.Error("Error creating log directory for client", "client", gc.name, "directory", gc.dir, "error", err)
-				os.Exit(1)
-			}
-		} else {
-			slog.Error(err.Error())
-			os.Exit(1)
-		}
+		slog.Error("Error creating log directory for client", "client", gc.name, "directory", gc.dir, "error", err)
+		os.Exit(1)
 	}
 	// start processing received data
 	g.ProcessReceivedData(ctx, gc)
