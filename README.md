@@ -13,12 +13,14 @@ Supported Linux distributions: ubuntu, debian, linuxmint, fedora, centos, rhel, 
 2. Deploy in seconds - install logging server and client, specify desired files and watch your logs fly!
 3. If you just need to stream your log files as they are (without any complex proccessing) then there is no easier way than glog!
 
-# How to use?
+# How to install glog?
 
-1. Download installation script and run it (sudo privileges required):
+1. Easiest way is to download the installation script and run it (sudo privileges required):
 ```bash
 bash <(curl -sSLf https://glog.proxilius.eu/download/install.sh)
 ```
+It contains the service file aside from glog itself and installs it on your system.
+
 2. Edit configuration file in `/etc/glog/config.toml` to fit your case
 
 3. Run glog service:
@@ -27,6 +29,12 @@ systemctl start glog
 ```
 
 For more info about configuration see [Configuration](https://github.com/Fishmansky/glog?tab=readme-ov-file#Configuration) section.
+
+Download links:
+- https://glog.proxilius.eu/download/glog-amd64.tar.gz
+- https://glog.proxilius.eu/download/glog-arm64.tar.gz
+- https://glog.proxilius.eu/download/glog-arm.tar.gz
+- https://glog.proxilius.eu/download/glog-386.tar.gz
 
 # How it works?
 
