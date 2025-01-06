@@ -8,13 +8,16 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/spf13/viper"
 )
 
 type GlogServer struct {
 	GlogServerConfig
+	listener net.Listener
 }
 
 type GlogServerConfig struct {
@@ -181,25 +184,30 @@ func (g *GlogServer) HandleConnection(ctx context.Context, c net.Conn) {
 	g.ProcessReceivedData(ctx, gc)
 }
 
-func (g *GlogServer) Run() {
-	l, err := net.Listen("tcp", g.addr)
-	if err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-	defer l.Close()
-	defer g.serverLog.Close()
-	slog.Info("Server started", "Listening address", g.addr)
-	ctx := context.TODO()
-
+func (g *GlogServer) ListenForConnections(ctx context.Context) {
 	for {
-		conn, err := l.Accept()
+		conn, err := g.listener.Accept()
 		if err != nil {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}
-		go func() {
-			g.HandleConnection(ctx, conn)
-		}()
+		go g.HandleConnection(ctx, conn)
 	}
+}
+
+func (g *GlogServer) Run() {
+	var err error
+	g.listener, err = net.Listen("tcp", g.addr)
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+	defer g.listener.Close()
+	defer g.serverLog.Close()
+	slog.Info("Server started", "Listening address", g.addr)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
+	defer cancel()
+	go g.ListenForConnections(ctx)
+	<-ctx.Done()
+	slog.Info("Termination signal received - server gracefully shutting down now.")
 }
