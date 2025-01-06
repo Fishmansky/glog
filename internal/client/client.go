@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -209,7 +211,7 @@ func (g *GlogClient) ServerHandshake() {
 		slog.Error("Server settle request malformed!")
 		os.Exit(1)
 	}
-	slog.Info("Client connected", "Server address", g.addr)
+	slog.Info("Connection with server established", "Server address", g.addr)
 }
 
 func (g *GlogClient) ConnectToServer() {
@@ -220,19 +222,13 @@ func (g *GlogClient) ConnectToServer() {
 	var err error
 	g.conn, err = d.DialContext(ctx, "tcp", g.addr)
 	if err != nil {
-		slog.Error("Failed to connect to glog server: %v", "error", err)
+		slog.Error("Failed to connect to glog server", "error", err)
 		os.Exit(1)
 	}
 }
 
-func (g *GlogClient) Run() {
-	g.ConnectToServer()
-	g.ServerHandshake()
-
+func (g *GlogClient) StreamLogs(ctx context.Context) {
 	logsChan := g.GetLogsChan()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	for {
 		select {
 		case <-ctx.Done():
@@ -249,4 +245,16 @@ func (g *GlogClient) Run() {
 			slog.Debug("Log sent!")
 		}
 	}
+}
+
+func (g *GlogClient) Run() {
+	g.ConnectToServer()
+	g.ServerHandshake()
+
+	slog.Info("Client started")
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
+	defer cancel()
+	go g.StreamLogs(ctx)
+	<-ctx.Done()
+	slog.Info("Termination signal received - client gracefully shutting down...")
 }
