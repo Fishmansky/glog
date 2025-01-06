@@ -46,8 +46,8 @@ Server stores logs from clients in separate directories in `/var/log/glog/[CLIEN
 
 # Plans 
 
+- [X] Gracefull shutdown
 - [ ] SSL/TLS support
-- [ ] Gracefull shutdown
 
 # Configuration
 
