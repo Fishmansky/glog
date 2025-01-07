@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net"
@@ -94,7 +95,7 @@ func WatchFile(w *fsnotify.Watcher, src *os.File, filename string) *bufio.Reader
 		os.Exit(1)
 	}
 	slog.Debug("Watching file", "file", filename)
-	_, err = src.Seek(0, os.SEEK_END)
+	_, err = src.Seek(0, io.SeekEnd)
 	if err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
@@ -111,6 +112,7 @@ func StreamData(reader *bufio.Reader, logName string, c chan []byte) {
 		}
 		newData += line
 	}
+	slog.Debug("new data", "data", newData)
 	c <- []byte(logName + ":" + newData)
 }
 
