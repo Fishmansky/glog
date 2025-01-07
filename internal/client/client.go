@@ -87,6 +87,33 @@ func fileExists(path string) bool {
 	return err == nil
 }
 
+func WatchFile(w *fsnotify.Watcher, src *os.File, filename string) *bufio.Reader {
+	err := w.Add(filename)
+	if err != nil {
+		slog.Error("Error adding file to watcher", "file", filename, "error", err)
+		os.Exit(1)
+	}
+	slog.Debug("Watching file", "file", filename)
+	_, err = src.Seek(0, os.SEEK_END)
+	if err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+	return bufio.NewReader(src)
+}
+
+func StreamData(reader *bufio.Reader, logName string, c chan []byte) {
+	var newData string
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+		newData += line
+	}
+	c <- []byte(logName + ":" + newData)
+}
+
 func (g *GlogClient) GetLogsChan() <-chan []byte {
 	logschan := make(chan []byte)
 	watcher, err := fsnotify.NewWatcher()
@@ -94,27 +121,16 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
-	for logFile := range g.logFiles {
-		go func(l string) {
+	for l := range g.logFiles {
+		go func(logName string) {
 			defer watcher.Close()
-			src, err := os.Open(g.logFiles[l])
+			src, err := os.Open(g.logFiles[logName])
 			if err != nil {
-				slog.Error("Error opening file to read", "file", g.logFiles[l], "error", err)
+				slog.Error("Error opening file to read", "file", g.logFiles[logName], "error", err)
 				os.Exit(1)
 			}
 			defer src.Close()
-			err = watcher.Add(g.logFiles[l])
-			if err != nil {
-				slog.Error("Error adding file to watcher", "file", g.logFiles[l], "error", err)
-				os.Exit(1)
-			}
-			slog.Debug("Watching file", "file", g.logFiles[l])
-			_, err = src.Seek(0, os.SEEK_END)
-			if err != nil {
-				slog.Error(err.Error())
-				os.Exit(1)
-			}
-			reader := bufio.NewReader(src)
+			reader := WatchFile(watcher, src, g.logFiles[logName])
 			for {
 				select {
 				case event, ok := <-watcher.Events:
@@ -123,8 +139,8 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 					}
 					if event.Op == fsnotify.Remove || event.Op == fsnotify.Rename {
 						tries := 0
-						slog.Debug("Watched file disapeared - trying to rewatch", "file", g.logFiles[l])
-						if !fileExists(g.logFiles[l]) {
+						slog.Debug("Watched file disapeared - trying to rewatch", "file", g.logFiles[logName])
+						if !fileExists(g.logFiles[logName]) {
 							if tries > 50 {
 								slog.Error("Files rewatching error - 50 retries exceeded")
 								return
@@ -132,36 +148,17 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 							time.Sleep(time.Millisecond * 50)
 							tries++
 						}
-						src, err := os.Open(g.logFiles[l])
+						src, err := os.Open(g.logFiles[logName])
 						if err != nil {
-							slog.Error("Error opening file to read", "file", g.logFiles[l], "error", err)
+							slog.Error("Error opening file to read", "file", g.logFiles[logName], "error", err)
 							os.Exit(1)
 						}
 						defer src.Close()
-						err = watcher.Add(g.logFiles[l])
-						if err != nil {
-							slog.Error("Error adding file to watcher", "file", g.logFiles[l], "error", err)
-							os.Exit(1)
-						}
-						slog.Debug("Watching file", "file", g.logFiles[l])
-						_, err = src.Seek(0, os.SEEK_END)
-						if err != nil {
-							slog.Error(err.Error())
-							os.Exit(1)
-						}
-						reader = bufio.NewReader(src)
+						reader = WatchFile(watcher, src, g.logFiles[logName])
 					}
 					if event.Op == fsnotify.Write {
-						slog.Debug("Watched file changed", "file", g.logFiles[l])
-						var newData string
-						for {
-							line, err := reader.ReadString('\n')
-							if err != nil {
-								break
-							}
-							newData += line
-						}
-						logschan <- []byte(l + ":" + newData)
+						slog.Debug("Watched file changed", "file", g.logFiles[logName])
+						StreamData(reader, logName, logschan)
 					}
 				case err, ok := <-watcher.Errors:
 					if !ok {
@@ -170,7 +167,7 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 					slog.Error(err.Error())
 				}
 			}
-		}(logFile)
+		}(l)
 	}
 	return logschan
 }
