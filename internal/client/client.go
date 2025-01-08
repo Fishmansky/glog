@@ -224,6 +224,7 @@ func (g *GlogClient) ConnectToServer() {
 		slog.Error("Failed to connect to glog server", "error", err)
 		os.Exit(1)
 	}
+	g.ServerHandshake()
 }
 
 func (g *GlogClient) StreamLogs(ctx context.Context) {
@@ -248,8 +249,6 @@ func (g *GlogClient) StreamLogs(ctx context.Context) {
 
 func (g *GlogClient) Run() {
 	g.ConnectToServer()
-	g.ServerHandshake()
-
 	slog.Info("Client started")
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGKILL)
 	defer cancel()
