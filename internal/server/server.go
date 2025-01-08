@@ -30,9 +30,10 @@ type GlogServerConfig struct {
 }
 
 type GlogConnectedClient struct {
-	c    net.Conn
-	name string
-	dir  string
+	c       net.Conn
+	name    string
+	dir     string
+	logsMap map[uint8]string
 }
 
 func ReadGlogServerConfig() GlogServerConfig {
@@ -83,6 +84,7 @@ func New() *GlogServer {
 }
 
 func ValidateNewClient(c net.Conn) (*GlogConnectedClient, error) {
+	logsMap := make(map[uint8]string)
 	buf := make([]byte, 1024)
 	n, err := c.Read(buf)
 	if err != nil {
@@ -98,12 +100,30 @@ func ValidateNewClient(c net.Conn) (*GlogConnectedClient, error) {
 		return nil, err
 	}
 	slog.Debug("Connection confirmation sent to client", "client", splitted[1])
-	n, err = c.Read(buf)
-	if err != nil {
-		return nil, err
+	// receive log file and assign them with ids
+	var i uint8 = 0
+	for {
+		// process each received logname
+		n, err = c.Read(buf)
+		if err != nil {
+			return nil, err
+		}
+		str = string(buf[:n])
+		splitted = strings.Split(str, ":")
+		// if command is not new-log then break
+		if splitted[0] != "new-log" {
+			break
+		}
+		// assign log with id
+		logName := splitted[1]
+		logId := i
+		logsMap[logId] = logName
+		// send log id
+		if _, err := c.Write([]byte(fmt.Sprintf("new-log-id:%d", logId))); err != nil {
+			return nil, err
+		}
+		i++
 	}
-	str = string(buf[:n])
-	splitted = strings.Split(str, ":")
 	if splitted[0] != "confirmed-client" {
 		return nil, fmt.Errorf("Confirmed client connection request malformed.\n")
 	}
@@ -112,7 +132,8 @@ func ValidateNewClient(c net.Conn) (*GlogConnectedClient, error) {
 		return nil, err
 	}
 	slog.Debug("Connection acknowledgement sent to client", "client", splitted[1])
-	return &GlogConnectedClient{c: c, name: splitted[1]}, nil
+	slog.Debug("New logs map assigned", "client", splitted[1], "map", logsMap)
+	return &GlogConnectedClient{c: c, name: splitted[1], logsMap: logsMap}, nil
 }
 
 func (g *GlogServer) ProcessReceivedData(ctx context.Context, gc *GlogConnectedClient) {

@@ -10,6 +10,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -28,7 +30,8 @@ type GlogClientConfig struct {
 
 type GlogClient struct {
 	GlogClientConfig
-	conn net.Conn
+	conn    net.Conn
+	logsMap map[string]uint8
 }
 
 func ReadGlogClientConfig() GlogClientConfig {
@@ -174,6 +177,7 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 	return logschan
 }
 func (g *GlogClient) ServerHandshake() {
+	m := make(map[string]uint8)
 	// send connection request
 	data := []byte(fmt.Sprintf("new-client:%s", g.name))
 	if _, err := g.conn.Write(data); err != nil {
@@ -192,6 +196,36 @@ func (g *GlogClient) ServerHandshake() {
 		slog.Error("Server confirmation request malformed!")
 		os.Exit(1)
 	}
+	// send each log name to server to receive id assigned to this number
+	for k := range g.logFiles {
+		data := []byte(fmt.Sprintf("new-log:%s", g.logFiles[k]))
+		if _, err := g.conn.Write(data); err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		// read response with log id
+		buf := make([]byte, 1024)
+		n, err := g.conn.Read(buf)
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		response := strings.Split(string(buf[:n]), ":")
+		cmd := response[0]
+		if cmd != "new-log-id" {
+			slog.Error("Server confirmation request malformed!")
+			os.Exit(1)
+		}
+		idStr := response[1]
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			slog.Error("Log id conversion error", "msg", err.Error())
+			os.Exit(1)
+		}
+		m[k] = uint8(id)
+	}
+	g.logsMap = m
+	slog.Debug("Log files map created", "map", g.logsMap)
 	// send confirmation request
 	data = []byte(fmt.Sprintf("confirmed-client:%s", g.name))
 	if _, err := g.conn.Write(data); err != nil {
