@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -142,6 +144,7 @@ func (g *GlogServer) ProcessReceivedData(ctx context.Context, gc *GlogConnectedC
 		case <-ctx.Done():
 			return
 		default:
+			// TODO: peek info buffer to see if contains log prefix - if not ask for resending
 			// receive data
 			buf := make([]byte, 1024)
 			n, err := gc.c.Read(buf)
@@ -153,7 +156,13 @@ func (g *GlogServer) ProcessReceivedData(ctx context.Context, gc *GlogConnectedC
 				slog.Error(err.Error())
 				os.Exit(1)
 			}
-			i := 0
+			// check first two bytes
+			if buf[0] != '!' || buf[1] != ':' {
+				slog.Info("Received malformed data from client", "client", gc.name, "data", string(buf))
+				continue
+			}
+			// find index if closing : sign
+			i := 2
 			for i < len(buf) {
 				if buf[i] == 58 {
 					i++
@@ -161,22 +170,29 @@ func (g *GlogServer) ProcessReceivedData(ctx context.Context, gc *GlogConnectedC
 				}
 				i++
 			}
-			logFileName := string(buf[:i-1])
-			data := buf[i:n]
-			logPath := gc.dir + "/" + logFileName
+			// get log id
+			logID, err := strconv.Atoi(string(buf[2 : i-1]))
+			if err != nil {
+				slog.Error("logId conversion error", "msg", err.Error())
+				return
+			}
+			data := (buf[i:n])
+			logPath := gc.dir + "/" + gc.logsMap[uint8(logID)]
+			// check for multiple lines
+			logPrefix := fmt.Sprintf("!:%d:", logID)
+			logLines := bytes.Split(data, []byte(logPrefix))
 			// save data
 			f, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 			if err != nil {
 				slog.Error("Error opening log file", "file", logPath, "error", err)
 				os.Exit(1)
 			}
-			if _, err := f.Write(data); err != nil {
-				slog.Error("Error writing log file", "file", logPath, "error", err)
-				os.Exit(1)
-			}
-			if err := f.Close(); err != nil {
-				slog.Error("Error closing log file", "file", logPath, "error", err)
-				os.Exit(1)
+			defer f.Close()
+			for i := range logLines {
+				if _, err := f.Write(logLines[i]); err != nil {
+					slog.Error("Error writing log file", "file", logPath, "error", err)
+					os.Exit(1)
+				}
 			}
 			slog.Debug("File updated", "file", logPath)
 		}

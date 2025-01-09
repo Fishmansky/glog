@@ -106,7 +106,7 @@ func WatchFile(w *fsnotify.Watcher, src *os.File, filename string) *bufio.Reader
 	return bufio.NewReader(src)
 }
 
-func StreamData(reader *bufio.Reader, logName string, c chan []byte) {
+func StreamData(reader *bufio.Reader, logID uint8, c chan []byte) {
 	var newData string
 	for {
 		line, err := reader.ReadString('\n')
@@ -116,7 +116,7 @@ func StreamData(reader *bufio.Reader, logName string, c chan []byte) {
 		newData += line
 	}
 	slog.Debug("new data", "data", newData)
-	c <- []byte(logName + ":" + newData)
+	c <- []byte(fmt.Sprintf("!:%d:%s", logID, newData))
 }
 
 func (g *GlogClient) GetLogsChan() <-chan []byte {
@@ -128,6 +128,7 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 	}
 	for l := range g.logFiles {
 		go func(logName string) {
+			logID := g.logsMap[logName]
 			defer watcher.Close()
 			src, err := os.Open(g.logFiles[logName])
 			if err != nil {
@@ -163,7 +164,7 @@ func (g *GlogClient) GetLogsChan() <-chan []byte {
 					}
 					if event.Op == fsnotify.Write {
 						slog.Debug("Watched file changed", "file", g.logFiles[logName])
-						StreamData(reader, logName, logschan)
+						StreamData(reader, logID, logschan)
 					}
 				case err, ok := <-watcher.Errors:
 					if !ok {
@@ -198,7 +199,7 @@ func (g *GlogClient) ServerHandshake() {
 	}
 	// send each log name to server to receive id assigned to this number
 	for k := range g.logFiles {
-		data := []byte(fmt.Sprintf("new-log:%s", g.logFiles[k]))
+		data := []byte(fmt.Sprintf("new-log:%s", k))
 		if _, err := g.conn.Write(data); err != nil {
 			slog.Error(err.Error())
 			os.Exit(1)
